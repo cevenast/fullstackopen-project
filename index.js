@@ -1,68 +1,67 @@
 const express = require('express')
 const app = express()
 const cors = require('cors')
-PORT = process.env.PORT || 3001
+const mongoose = require('mongoose')
+const morgan = require('morgan')
+
+require('dotenv').config()
+const Note = require('./models/note.js')
+
+// Middleware
 
 app.use(express.json())
 app.use(cors())
 app.use(express.static('build'))
+app.use(morgan('tiny'))
 // app.use(express.urlencoded({extended:false}))
 
-let notes = [
-    {    
-        id: 1,
-        content: "HTML is easy",     
-        important: true  
-    },  
-    {
-        id: 2,
-        content: "Browser can execute only JavaScript",
-        important: false  
-    },  
-    {    
-        id: 3,    
-        content: "GET and POST are the most important methods of HTTP protocol",    
-        important: true  
-    }
-]
-
-app.get('/', (req, res) => {
-    res.send('<h1>Super Title</h1>')
-})
+// Gets all notes from the fetch made by React with axios and useEffect  
 
 app.get('/api/notes/', (req, res) => {
-     res.json(notes)
+     Note.find({})
+        .then(notes => {
+            res.json(notes)
+        })
 }) 
 
-app.get('/api/notes/:id', (req, res) => {
-    const id = req.params.id
-    const note = notes.find(note => note.id == id)
-    if (note){
-        res.json(note)
-    }
-    else{
-        res.sendStatus(404).end() // for responding to the request without sending any data.
-    }
-})
+// Get a specific note by id
+app.get('/api/notes/:id', (request, response, next) => {  Note.findById(request.params.id)
+    .then(note => {
+      if (note) {
+        response.json(note)
+      } else {
+        response.status(404).end()
+      }
+    })
+    .catch(error => next(error))})
 
+
+// Add a new note to the database
 app.post('/api/notes', (req, res) => {
-    const note = {
+    const note = new Note({
         content:req.body.content,
         important:req.body.important || false,
-        id: notes[notes.length-1].id + 1
-    }
-
-    notes.push(note)
-    res.json(note)
+    })
+    note.save()
+        .then(note => {
+            res.json(note)
+            console.log(`Added new note:\n${note}`)
+        })
+        .catch(err => {
+            console.log(err.message)
+            res.status(404).send({error: 'unvalid note schema'})
+        })
 })
 
 
 app.delete('/api/notes/:id', (req, res) => {
     const id = req.params.id
-    notes = notes.filter(note => note.id != id)
-    res.status(204).end()
+    Note.findByIdAndDelete(id)
+       .then(result => res.status(204).end())
+       .catch(err => next(err))
     console.log(`${id} was removed`)
 })
+
 
 app.put('/api/notes/:id', (req,res) => {
     const id = req.params.id
@@ -72,12 +71,29 @@ app.put('/api/notes/:id', (req,res) => {
     console.log(`note ${note.id} importance was set to ${note.important}`)
 })
 
+// 404 Unknown Endpoint
+
 const unknownEndpoint = (request, response) => {
     response.status(404).send({ error: 'unknown endpoint' })
   }
-  
-  app.use(unknownEndpoint) // Returns error message in JSON format
+app.use(unknownEndpoint) // Returns error message in JSON format
 
-app.listen(PORT, (req,res) => {
+
+
+// Error Handler
+
+const errorHandler = (error, request, response, next) => {
+    console.error(error.message)
+
+    if (error.name === 'CastError') {
+        return response.status(400).send({ error: 'malformatted id' })
+    } 
+
+    next(error)
+}
+app.use(errorHandler)
+
+
+app.listen(PORT = process.env.PORT, (req,res) => {
     console.log(`Server is running on PORT ${PORT}`)
 })
