@@ -57,18 +57,27 @@ app.post('/api/notes', (req, res) => {
 app.delete('/api/notes/:id', (req, res) => {
     const id = req.params.id
     Note.findByIdAndDelete(id)
-       .then(result => res.status(204).end())
+       .then(result => {
+        res.status(204).end()
+        console.log(`${id} was removed`)
+    })
        .catch(err => next(err))
-    console.log(`${id} was removed`)
 })
 
 
 app.put('/api/notes/:id', (req,res) => {
     const id = req.params.id
-    let note = notes.find(note => note.id == id)
-    note.important = !note.important
-    res.send(note)
-    console.log(`note ${note.id} importance was set to ${note.important}`)
+    const note = {
+        content: req.body.content,
+        important: req.body.important
+    }
+
+    Note.findByIdAndUpdate(id,note,{ new: true })
+       .then(updatedNote => {
+        res.json(updatedNote)
+        console.log(`note ${id} importance was set to ${note.important}`)
+       })
+       .catch(err => next(err))
 })
 
 // 404 Unknown Endpoint
